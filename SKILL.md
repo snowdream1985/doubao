@@ -35,7 +35,7 @@ allowed-tools: Bash, Read, Write
    - macOS Intel：`bin/osx-x64/doubao`
 2. **每次 Bash 调用开头都要重新解析可执行文件**，不要假设 shell 变量跨工具调用保留。
 3. 必须配置 Ark API Key。用 `"$DOUBAO" config show` 验证；若显示 `(未设置)`，运行 `"$DOUBAO" config set api-key <KEY>`（Key 来自 https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey）。
-4. **模型 ID 必须带日期后缀**（如 `doubao-seedream-5-0-lite-260128`、`doubao-seedance-2-0-260128`，而非 `doubao-seedream-5-0-lite`）。不确定就问用户，**不要凭空猜日期后缀**。
+4. **模型 ID 必须带日期后缀**（如 `doubao-seedream-5-0-260128`、`doubao-seedance-2-0-260128`，而非 `doubao-seedream-5-0-lite`）。不确定就问用户，**不要凭空猜日期后缀**。
 
 ## 模型选择优先级
 
@@ -96,7 +96,7 @@ fi
 
 ```bash
 "$DOUBAO" image gen \
-  --model <seedream-5.0-lite-model-id> \
+  --model <seedream-5.0-model-id> \
   --prompt "<用户提示词>" \
   --size 1440x2560 \
   --out <输出路径> \
@@ -112,7 +112,7 @@ fi
 
 ```bash
 "$DOUBAO" image gen \
-  --model <seedream-5.0-lite-model-id> \
+  --model <seedream-5.0-model-id> \
   --prompt "把背景换成樱花林，保持手机竖屏构图" \
   --image /abs/path/source.jpg \
   --size 1440x2560 \
@@ -126,7 +126,7 @@ fi
 
 ```bash
 "$DOUBAO" image gen \
-  --model <seedream-5.0-lite-model-id> \
+  --model <seedream-5.0-model-id> \
   --prompt "四格漫画：..." \
   --sequential auto \
   --max-images 4 \
@@ -141,7 +141,7 @@ fi
 
 | 选项 | 取值 | 说明 |
 |---|---|---|
-| `--model` | 带日期后缀的完整 ID | 必填。默认家族 Seedream 5.0-lite，如 `doubao-seedream-5-0-lite-*`；不确定就问用户 |
+| `--model` | 带日期后缀的完整 ID | 必填。默认家族 Seedream 5.0-lite，如 `doubao-seedream-5-0-*`；不确定就问用户 |
 | `--prompt` | 字符串 | 必填（除非 `--prompt-stdin`） |
 | `--prompt-stdin` | flag | 从 stdin 读提示词（提示词 > 30KB 时用，规避 Windows cmd 32KB 上限） |
 | `--image` | 路径或 URL，可重复 | 参考图 1–14 张 |
@@ -163,7 +163,7 @@ fi
 成功：
 ```json
 {
-  "model": "doubao-seedream-5-0-lite-260128",
+  "model": "doubao-seedream-5-0-260128",
   "created": 1782295362,
   "files": ["/abs/path/result.jpg"],
   "items": [{"size": "1440x2560", "url": "https://ark-..."}],

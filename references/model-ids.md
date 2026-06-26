@@ -16,7 +16,7 @@
 
 实际模型 ID 随火山引擎发布新版而变化。2026 年 6 月示例：
 
-- `doubao-seedream-5-0-lite-260128`
+- `doubao-seedream-5-0-260128`
 - `doubao-seedream-4-5-251128`
 
 **绝不凭空编日期后缀**。不确定时让用户从[控制台](https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement)复制。
