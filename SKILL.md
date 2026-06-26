@@ -28,36 +28,50 @@ allowed-tools: Bash, Read, Write
 
 ## 前置条件
 
-1. 需要可用的 `doubao` 可执行文件。优先用 PATH 上的 `doubao`；找不到时回退到本 skill 自带的 `bin/<rid>/`：
-   - Windows x64：`doubao/bin/win-x64/doubao.exe`
-   - Linux x64：`doubao/bin/linux-x64/doubao`
-   - macOS Apple Silicon：`doubao/bin/osx-arm64/doubao`
-   - macOS Intel：`doubao/bin/osx-x64/doubao`
+1. 需要可用的 `doubao` 可执行文件。优先用 PATH 上的 `doubao`；找不到时回退到本 skill 自带的二进制（路径相对于 **skill 根目录**，即本 `SKILL.md` 所在目录）：
+   - Windows x64：`bin/win-x64/doubao.exe`
+   - Linux x64：`bin/linux-x64/doubao`
+   - macOS Apple Silicon：`bin/osx-arm64/doubao`
+   - macOS Intel：`bin/osx-x64/doubao`
 2. **每次 Bash 调用开头都要重新解析可执行文件**，不要假设 shell 变量跨工具调用保留。
 3. 必须配置 Ark API Key。用 `"$DOUBAO" config show` 验证；若显示 `(未设置)`，运行 `"$DOUBAO" config set api-key <KEY>`（Key 来自 https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey）。
 4. **模型 ID 必须带日期后缀**（如 `doubao-seedream-5-0-lite-260128`、`doubao-seedance-2-0-260128`，而非 `doubao-seedream-5-0-lite`）。不确定就问用户，**不要凭空猜日期后缀**。
-5.用户未指定模型时图片模型优先使用5.0、4.5、4.0，视频模型优先使用2.0、2.0-fast、2.0-mini、1.5pro，在调用api提示模型不存在时使用备选模型。
+
+## 模型选择优先级
+
+用户未指定模型时按以下优先级选择，若 API 返回模型不存在（退出码 2，`InvalidEndpointOrModel.NotFound`）则依次降级：
+
+- **图片**：Seedream 5.0-lite → 4.5 → 4.0
+- **视频**：Seedance 2.0 full → 2.0-fast → 2.0-mini → 1.5-pro
 
 ## 解析 CLI 可执行文件
 
 每个 Bash 命令块开头都先跑这段解析器，再调用 `doubao`：
 
 ```bash
+# SKILL_DIR：本 skill 的根目录（bin/ 所在目录）
+# 用 Read 工具查出 SKILL.md 的绝对路径，去掉文件名得到目录，然后填入下方。
+# 示例（Linux/macOS）：SKILL_DIR="/home/user/.codebuddy/skills/doubao"
+# 示例（Windows Git Bash）：SKILL_DIR="/c/Users/user/.codebuddy/skills/doubao"
+SKILL_DIR="<skill根目录绝对路径>"   # ← 调用前替换为实际路径
+
 if command -v doubao >/dev/null 2>&1; then
   DOUBAO="doubao"
-elif [ -x "./doubao/bin/win-x64/doubao.exe" ]; then
-  DOUBAO="./doubao/bin/win-x64/doubao.exe"
-elif [ -x "./doubao/bin/linux-x64/doubao" ]; then
-  DOUBAO="./doubao/bin/linux-x64/doubao"
-elif [ -x "./doubao/bin/osx-arm64/doubao" ]; then
-  DOUBAO="./doubao/bin/osx-arm64/doubao"
-elif [ -x "./doubao/bin/osx-x64/doubao" ]; then
-  DOUBAO="./doubao/bin/osx-x64/doubao"
+elif [ -x "$SKILL_DIR/bin/linux-x64/doubao" ]; then
+  DOUBAO="$SKILL_DIR/bin/linux-x64/doubao"
+elif [ -x "$SKILL_DIR/bin/osx-arm64/doubao" ]; then
+  DOUBAO="$SKILL_DIR/bin/osx-arm64/doubao"
+elif [ -x "$SKILL_DIR/bin/osx-x64/doubao" ]; then
+  DOUBAO="$SKILL_DIR/bin/osx-x64/doubao"
+elif [ -x "$SKILL_DIR/bin/win-x64/doubao.exe" ]; then
+  DOUBAO="$SKILL_DIR/bin/win-x64/doubao.exe"
 else
-  echo "找不到 doubao CLI。请放到 PATH 上，或置于 doubao/bin/<rid>/ 下" >&2
+  echo "找不到 doubao CLI。请放到 PATH 上，或置于 <skill根目录>/bin/<rid>/ 下" >&2
   exit 127
 fi
 ```
+
+> **关于 `SKILL_DIR`**：每次 Bash 调用前，先用 `Read` 工具确认本 `SKILL.md` 的绝对路径，取其所在目录即为 `SKILL_DIR`。Windows 下 Git Bash 路径须转换为 `/c/...` 形式；若运行环境是原生 PowerShell，则需先确认 bash 可用，或直接把 doubao 放到 PATH 里。
 
 之后统一用 `"$DOUBAO" image gen ...` / `"$DOUBAO" video gen ...` / `"$DOUBAO" task ...`，不要硬编码 `doubao`。
 
@@ -285,7 +299,7 @@ CLI 自动推断 `role=first_frame`。
 | 选项 | 说明 |
 |---|---|
 | `--model` | 必填，带日期后缀。默认家族 Seedance 2.0 full，如 `doubao-seedance-2-0-*`；不确定就问用户 |
-| `--prompt` | 有参考媒体时可选 |
+| `--prompt` | 纯文生视频时必填；有参考媒体（图/视频）时可选 |
 | `--resolution` | `480p` / `720p` / `1080p` / `4k`；移动端默认 `720p` |
 | `--ratio` | `16:9` / `4:3` / `1:1` / `3:4` / `9:16` / `21:9` / `adaptive`；移动端默认 `9:16` |
 | `--duration` | 整数秒；传 `-1` 让模型自定（仅 2.0 / 1.5-pro） |
@@ -297,7 +311,8 @@ CLI 自动推断 `role=first_frame`。
 | `--return-last-frame` | 额外返回尾帧 PNG，便于连续生成 |
 | `--web-search` | 仅 2.0 系列 |
 | `--priority` | 0–9，仅 2.0 系列 |
-| `--service-tier` | `default`（在线）/ `flex`（离线半价，2.0 系列不支持） |
+| `--service-tier` | `default`（在线实时，全价）/ `flex`（离线半价，**Seedance 2.0 系列不支持 flex**） |
+| `--frames` | 整数，仅 **1.0-pro / 1.0-pro-fast**；范围 `[29, 289]`，须满足 `(frames-25) % 4 == 0`；与 `--duration` 二选一 |
 | `--seed` | 非 2.0 系列 |
 | `--camera-fixed` | 非 2.0 系列 |
 | `--watermark` | 视频默认 false |
