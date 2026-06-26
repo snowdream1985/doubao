@@ -39,10 +39,18 @@ allowed-tools: Bash, Read, Write
 
 ## 模型选择优先级
 
-用户未指定模型时按以下优先级选择，若 API 返回模型不存在（退出码 2，`InvalidEndpointOrModel.NotFound`）则依次降级：
+用户未指定模型时，按以下顺序依次尝试；若 API 返回模型不存在（退出码 2，`InvalidEndpointOrModel.NotFound`）则降级到下一个：
 
-- **图片**：Seedream 5.0 → 4.5 → 4.0
-- **视频**：Seedance 2.0 full → 2.0-fast → 2.0-mini → 1.5-pro
+**图片**（优先 → 备选）：
+1. `doubao-seedream-5-0-260128`
+2. `doubao-seedream-4-5-251128`
+3. `doubao-seedream-4-0-250828`
+
+**视频**（优先 → 备选）：
+1. `doubao-seedance-2-0-260128`
+2. `doubao-seedance-2-0-fast-260128`
+3. `doubao-seedance-2-0-mini-260615`
+4. `doubao-seedance-1-5-pro-251215`
 
 ## 解析 CLI 可执行文件
 
@@ -369,7 +377,7 @@ CLI 自动推断 `role=first_frame`。
 ## 错误处理规则
 
 - **退出码 2 不要盲目重试**——hint 通常已说明问题，修一次再升级给用户。
-- **模型 404**（`InvalidEndpointOrModel.NotFound`）：模型 ID 错或账户未开通，让用户从控制台粘贴实际已开通的完整 ID。
+- **模型 404**（`InvalidEndpointOrModel.NotFound`）：若使用的是默认模型列表中的 ID，自动降级到下一个；若已降级至最后一个仍失败，或用户明确指定了某 ID，则告知用户该 ID 未开通，让其从控制台确认已开通的完整 ID。
 - **敏感内容被拒**：告知用户、请其改写提示词，未经同意不要自动改写。
 - **Seedance 2.0 真人脸审核失败**：2.0 系列拒绝含真实人脸的参考素材，除非来自本账号近 30 天 Seedance 2.0 生成内容或素材库 `asset://<ID>`。告知用户，不要重试。
 - **64MB 请求体超限**：本地大图/大视频 base64 后超限，让用户改用公网 URL。
