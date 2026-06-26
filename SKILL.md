@@ -35,13 +35,13 @@ allowed-tools: Bash, Read, Write
    - macOS Intel：`bin/osx-x64/doubao`
 2. **每次 Bash 调用开头都要重新解析可执行文件**，不要假设 shell 变量跨工具调用保留。
 3. 必须配置 Ark API Key。用 `"$DOUBAO" config show` 验证；若显示 `(未设置)`，运行 `"$DOUBAO" config set api-key <KEY>`（Key 来自 https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey）。
-4. **模型 ID 必须带日期后缀**（如 `doubao-seedream-5-0-260128`、`doubao-seedance-2-0-260128`，而非 `doubao-seedream-5-0-lite`）。不确定就问用户，**不要凭空猜日期后缀**。
+4. **模型 ID 必须带日期后缀**（如 `doubao-seedream-5-0-260128`、`doubao-seedance-2-0-260128`，而非 `doubao-seedream-5-0`）。不确定就问用户，**不要凭空猜日期后缀**。
 
 ## 模型选择优先级
 
 用户未指定模型时按以下优先级选择，若 API 返回模型不存在（退出码 2，`InvalidEndpointOrModel.NotFound`）则依次降级：
 
-- **图片**：Seedream 5.0-lite → 4.5 → 4.0
+- **图片**：Seedream 5.0 → 4.5 → 4.0
 - **视频**：Seedance 2.0 full → 2.0-fast → 2.0-mini → 1.5-pro
 
 ## 解析 CLI 可执行文件
@@ -85,7 +85,7 @@ fi
 
 1. 用上面的解析器拿到 `DOUBAO`，再用一次 `"$DOUBAO" config show` 验证前置条件。
 2. 从用户意图判断场景：文生图 / 图生图 / 多图融合 / 组图。
-3. 选模型：新需求默认用 **Seedream 5.0-lite**（生成内容主要在手机上看）；仅当用户明确要求或账户未开通 5.0-lite 时才用 Seedream 4.5。
+3. 选模型：新需求默认用 **Seedream 5.0**（生成内容主要在手机上看）；仅当用户明确要求或账户未开通 5.0 时才用 Seedream 4.5。
 4. 默认输出形状：2K 竖屏。用显式像素 `1440x2560` 同时表达 2K 画质 + 手机竖屏比例。
 5. 用 Bash 运行。退出码 0 = 成功，stdout 的 JSON 里 `.files[]` 是生成图片的绝对路径。
 6. 把文件路径（数量、可选大小）回报给用户。
@@ -103,7 +103,7 @@ fi
   --json
 ```
 
-- `--size`：默认 `1440x2560`（2K 级 9:16 竖屏）。也支持语义值 `2K` / `3K`（仅 5.0-lite）/ `4K`，或显式像素 `2048x2048`。Seedream 4.5 只支持 `2K` / `4K`（无 `3K`）。
+- `--size`：默认 `1440x2560`（2K 级 9:16 竖屏）。也支持语义值 `2K` / `3K`（仅 5.0）/ `4K`，或显式像素 `2048x2048`。Seedream 4.5 只支持 `2K` / `4K`（无 `3K`）。
 - `--out`：强烈建议用绝对路径。不给时落到当前目录 `{model}-{timestamp}.jpg`。
 
 ### 图生图 / 多图融合
@@ -141,16 +141,16 @@ fi
 
 | 选项 | 取值 | 说明 |
 |---|---|---|
-| `--model` | 带日期后缀的完整 ID | 必填。默认家族 Seedream 5.0-lite，如 `doubao-seedream-5-0-*`；不确定就问用户 |
+| `--model` | 带日期后缀的完整 ID | 必填。默认家族 Seedream 5.0，如 `doubao-seedream-5-0-*`；不确定就问用户 |
 | `--prompt` | 字符串 | 必填（除非 `--prompt-stdin`） |
 | `--prompt-stdin` | flag | 从 stdin 读提示词（提示词 > 30KB 时用，规避 Windows cmd 32KB 上限） |
 | `--image` | 路径或 URL，可重复 | 参考图 1–14 张 |
 | `--size` | `1440x2560` / `2K` / `3K` / `4K` / `WxH` | 默认 `1440x2560`；家族相关，详见 `references/model-ids.md` |
 | `--sequential` | `disabled` / `auto` | `auto` 启用组图 |
 | `--max-images` | 1–15 | 输入+输出合计 ≤ 15 |
-| `--web-search` | flag | 仅 Seedream 5.0 lite |
+| `--web-search` | flag | 仅 Seedream 5.0 |
 | `--watermark` | `true`/`false` | 默认 true |
-| `--output-format` | `jpeg`/`png` | 仅 Seedream 5.0 lite |
+| `--output-format` | `jpeg`/`png` | 仅 Seedream 5.0 |
 | `--response-format` | `url`/`b64_json` | 默认 `url`；两种都会本地下载 |
 | `--out` | 路径或目录 | 默认 `./{model}-{timestamp}.jpg` |
 | `--json` | flag | agent 调用务必带 |
