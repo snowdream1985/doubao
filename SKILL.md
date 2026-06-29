@@ -116,7 +116,7 @@ fi
 
 ### 图生图 / 多图融合
 
-重复传 `--image <路径或URL>`。本地文件自动 base64，HTTP URL 直接透传。
+重复传 `--image <路径或URL>`。本地文件会自动上传到对象存储（OSS）再以 URL 传入，HTTP URL 直接透传。
 
 ```bash
 "$DOUBAO" image gen \
@@ -128,7 +128,7 @@ fi
   --json
 ```
 
-最多 14 张参考图。所有图 base64 合计须 < 64MB 请求体（超了 CLI 会拒绝并提示改用公网 URL）。
+最多 14 张参考图。本地文件自动上传 OSS，单图 ≤ 30MB（不再受请求体合计大小限制）。
 
 ### 组图（多图连续）
 
@@ -157,7 +157,7 @@ fi
 | `--sequential` | `disabled` / `auto` | `auto` 启用组图 |
 | `--max-images` | 1–15 | 输入+输出合计 ≤ 15 |
 | `--web-search` | flag | 仅 Seedream 5.0 |
-| `--watermark` | `true`/`false` | 默认 true |
+| `--watermark` | `true`/`false` | 默认 false（传 `--watermark` 开启水印） |
 | `--output-format` | `jpeg`/`png` | 仅 Seedream 5.0 |
 | `--response-format` | `url`/`b64_json` | 默认 `url`；两种都会本地下载 |
 | `--out` | 路径或目录 | 默认 `./{model}-{timestamp}.jpg` |
@@ -271,7 +271,7 @@ CLI 自动推断 `role=first_frame`。
   --resolution 720p --ratio 9:16 --duration 4 --out <path> --json
 ```
 
-混用图片与 `--video`/`--audio` 时，参考图必须显式 `--image-role reference_image`（否则 CLI 默认按 `first_frame`，Ark 会拒）。本地视频 base64 后易超 64MB 请求体——大文件改用公网 URL。
+混用图片与 `--video`/`--audio` 时，参考图必须显式 `--image-role reference_image`（否则 CLI 默认按 `first_frame`，Ark 会拒）。本地视频/音频会自动上传 OSS 后以 URL 传入（单视频 ≤ 200MB、单音频 ≤ 15MB）。
 
 ### 编辑 / 延长已有视频
 
@@ -311,9 +311,9 @@ CLI 自动推断 `role=first_frame`。
 | `--resolution` | `480p` / `720p` / `1080p` / `4k`；移动端默认 `720p` |
 | `--ratio` | `16:9` / `4:3` / `1:1` / `3:4` / `9:16` / `21:9` / `adaptive`；移动端默认 `9:16` |
 | `--duration` | 整数秒；传 `-1` 让模型自定（仅 2.0 / 1.5-pro） |
-| `--image` | 可重复。本地路径自动 base64，URL 透传 |
+| `--image` | 可重复。本地路径自动上传 OSS，URL 透传 |
 | `--image-role` | 覆盖自动推断：`first_frame` / `last_frame` / `reference_image` |
-| `--video` | 参考视频，仅 Seedance 2.0 系列，强烈建议用 URL |
+| `--video` | 参考视频，仅 Seedance 2.0 系列。本地文件自动上传 OSS（≤ 200MB），URL 透传 |
 | `--audio` | 参考音频，仅 Seedance 2.0 系列 |
 | `--generate-audio` | 2.0/1.5-pro 默认 true。传 `false` 出无声视频 |
 | `--return-last-frame` | 额外返回尾帧 PNG，便于连续生成 |
@@ -380,11 +380,201 @@ CLI 自动推断 `role=first_frame`。
 - **模型 404**（`InvalidEndpointOrModel.NotFound`）：若使用的是默认模型列表中的 ID，自动降级到下一个；若已降级至最后一个仍失败，或用户明确指定了某 ID，则告知用户该 ID 未开通，让其从控制台确认已开通的完整 ID。
 - **敏感内容被拒**：告知用户、请其改写提示词，未经同意不要自动改写。
 - **Seedance 2.0 真人脸审核失败**：2.0 系列拒绝含真实人脸的参考素材，除非来自本账号近 30 天 Seedance 2.0 生成内容或素材库 `asset://<ID>`。告知用户，不要重试。
-- **64MB 请求体超限**：本地大图/大视频 base64 后超限，让用户改用公网 URL。
+- **OSS 上传失败**（退出码 3，`oss_upload_error`）：本地素材上传对象存储失败（网络/凭证/对象存储异常）。可重试一次；持续失败则改用公网 URL 传入。本地单文件超限（图 30MB / 视频 200MB / 音频 15MB）会在上传前被拒，提示用户压缩或改用 URL。
 - **网络重试**：CLI 已对 5xx/瞬时错误内部重试，除非退出码 3 否则别在外层包重试。
 
 ## 输出约定
 
 - 图片：始终告诉用户每个生成文件的绝对路径；组图列全部。
 - 视频：报 `.video_path`；非默认时提一下 `.duration`/`.resolution`。
-- 不要把 base64 或 URL 当成果物——那是 24h 签名 URL，本地文件才是真正的产物。
+- 不要把 URL 当成果物——生成视频的 URL 是 24h 签名 URL，本地下载文件才是真正的产物。
+
+# 四、Windows 平台使用示例
+
+以下示例在 Windows（cmd.exe / PowerShell）下直接调用 `doubao`。前提：`doubao.exe` 在 PATH 上，或用本 skill 自带的 `bin/win-x64/doubao.exe`。`--model` 的日期后缀按实际开通的 ID 替换。
+
+## 配置与信息
+
+```
+:: 配置 API Key
+doubao config set api-key e8e32722-b5cf-47a2-8145-xxxxxxxxxxxx
+
+:: 查看 API Key（脱敏）
+doubao config show
+
+:: 查看版本信息
+doubao --version
+```
+
+## 图片生成
+
+```
+:: 文生图
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "身穿古风传统汉服的年轻女生高清写真"
+
+:: 图生图 / 编辑图片
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "将服装改为红色" --image portrait.jpg
+
+:: 指定图像大小：2K / 3K / 4K
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "身穿古风传统汉服的年轻女生高清写真" --size 2K
+
+:: 指定图像大小：具体分辨率
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "身穿古风传统汉服的年轻女生高清写真" --size 1440x2560
+
+:: 组图（自动判断张数）
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "制作乌鸦喝水的连环故事图片，生成4张图片" --sequential auto
+
+:: 组图，限制最多生成数量
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "制作乌鸦喝水故事的连环故事图片" --sequential auto --max-images 6
+
+:: 联网搜索
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "制作一张四川省乐山市未来5日的天气预报图" --web-search
+
+:: 水印（默认不加，传 true 开启）
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "四川省乐山市未来一周天气新闻" --watermark true
+
+:: 输出格式
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "最近一周科技行业热点新闻" --output-format png
+
+:: 图像返回格式
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "最近一周科技行业热点新闻" --response-format url
+
+:: 多参数随意组合
+doubao image gen --model doubao-seedream-5-0-260128 --prompt "制作4张北京市最新天气预报图片，每日一张，再生成一张汇总图，汇总图片参考weather.jpg图片样式" --image weather.jpg --size 1440x2560 --sequential auto --max-images 6 --web-search --output-format png --response-format url --watermark true
+```
+
+## 视频生成
+
+```
+:: 文生视频
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "海浪拍打礁石"
+
+:: 图生视频（首帧）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "让她微笑" --image women.jpg
+
+:: 图生视频（首尾帧）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "乌鸦将石子放入瓶中，终于喝到水了" --image first.jpg --image last.jpg
+
+:: 多模态参考：三张参考图（≥3 张图自动按 reference_image 处理）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "乌鸦将石子放入瓶中，终于喝到水了" --image image-00.jpg --image image-01.jpg --image image-02.jpg
+
+:: 多模态参考：视频参考
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "将乌鸦换成鹦鹉" --video v.mp4
+
+:: 指定分辨率（默认 720p）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "年轻女孩在跳舞，身穿汉服" --resolution 1080p
+
+:: 指定比例（默认 9:16）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "年轻女孩在跳舞，身穿汉服" --ratio 16:9
+
+:: 指定时长（默认 5 秒）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "年轻女孩在跳舞，身穿汉服" --duration 10
+
+:: 不生成音频（默认生成）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "年轻女孩在跳舞，身穿汉服" --generate-audio false
+
+:: 添加水印（默认不加）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "年轻女孩在跳舞，身穿汉服" --watermark true
+
+:: 联网搜索
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "制作四川省乐山市未来5日的天气预报视频" --web-search
+
+:: 返回视频尾帧图像
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "年轻女孩在跳舞，身穿汉服" --return-last-frame
+
+:: 多参数随意组合
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "将乌鸦换成鹦鹉" --video v.mp4 --resolution 1080p --duration 10 --generate-audio true --watermark true --return-last-frame
+```
+
+## 视频异步工作流（长任务首选，不阻塞）
+
+视频默认会阻塞等待并下载。长任务（1080p/4k、10s+）可用 `--no-wait` 立即拿 `task_id`，之后再查询/下载。
+
+```
+:: 1. 提交任务，立即返回 task_id（不等待、不下载）
+doubao video gen --model doubao-seedance-2-0-260128 --prompt "海浪拍打礁石" --resolution 1080p --duration 10 --no-wait
+
+:: 2. 查询单个任务状态（succeeded / running / failed ...）
+doubao task get cgt-xxxxxxxx
+
+:: 3. 列出近 7 天任务（可按状态/模型/分页过滤）
+doubao task list
+doubao task list --status succeeded --page-size 20
+
+:: 4. 成功后下载视频（指定输出路径）
+doubao task download cgt-xxxxxxxx --out result.mp4
+
+:: 4b. 若任务创建时带了 --return-last-frame，可一并下载尾帧
+doubao task download cgt-xxxxxxxx --out result.mp4 --last-frame
+
+:: 5. 取消排队中或删除已结束的任务
+doubao task cancel cgt-xxxxxxxx
+```
+
+> 生成视频的在线 URL 24 小时失效，务必用 `task download` 落地到本地；任务记录仅保留 7 天。
+
+## 中文 prompt 与引号注意事项（重要）
+
+不同 shell 对引号处理不同，**含中文/空格的 prompt 一定要正确加引号**：
+
+- **cmd.exe**：用**双引号** `"..."` 包 prompt。**不要用单引号** `'...'`——cmd 不识别单引号，会把引号当成内容的一部分。
+  ```
+  doubao image gen --model doubao-seedream-5-0-260128 --prompt "身穿汉服的女孩"
+  ```
+- **PowerShell**：单双引号都可（`'...'` 为字面、`"..."` 支持变量展开）。中文无需转义。
+- **Git Bash**：单双引号都可，按 POSIX 规则。
+- prompt 特别长（超过 cmd 约 32KB 行长上限）时，改用 `--prompt-stdin` 从标准输入读入，规避命令行长度限制。
+
+# 五、Linux / macOS 使用注意事项
+
+Linux/macOS 下用 bash/zsh 直接调用 `doubao`（在 PATH 上）或本 skill 自带的二进制。命令写法与上面的 `bash` 示例一致，把 `doubao` 换成对应可执行文件即可。
+
+## 选对架构的二进制
+
+- **Linux x64** → `bin/linux-x64/doubao`
+- **macOS Apple Silicon（M 系列）** → `bin/osx-arm64/doubao`
+- **macOS Intel** → `bin/osx-x64/doubao`
+- 用 `uname -m` 判断：`arm64` → osx-arm64，`x86_64` → osx-x64 / linux-x64。
+
+## 执行权限（最常见的坑）
+
+从 zip/git 解出的自带二进制可能丢失执行位，运行报 `Permission denied`：
+
+```bash
+chmod +x "$SKILL_DIR/bin/linux-x64/doubao"     # 或 osx-arm64 / osx-x64
+```
+
+## macOS 安全拦截（Gatekeeper / quarantine）
+
+下载来的二进制首次运行可能被拦（"无法验证开发者""已损坏"）。去掉隔离属性即可：
+
+```bash
+xattr -d com.apple.quarantine "$SKILL_DIR/bin/osx-arm64/doubao" 2>/dev/null || true
+```
+
+或在「系统设置 → 隐私与安全性」里点「仍要打开」。
+
+## 引号与路径
+
+- bash/zsh 单双引号都可，中文 prompt 直接用双引号即可，无需转义：
+  ```bash
+  doubao image gen --model doubao-seedream-5-0-260128 --prompt "身穿汉服的女孩"
+  ```
+- 路径含空格务必加引号；推荐用绝对路径（默认输出落当前工作目录）。
+- macOS 默认 shell 是 zsh，Linux 多为 bash，本 skill 的解析器脚本两者通用。
+
+## 配置与 API Key
+
+- 配置文件位置：`$XDG_CONFIG_HOME/doubao/config.json`，未设则 `~/.config/doubao/config.json`（写入时权限自动设为 `0600`，仅本人可读写）。
+- 除 `doubao config set api-key` 外，也可用环境变量（优先级：`--api-key` > 配置文件 > `ARK_API_KEY`）：
+  ```bash
+  export ARK_API_KEY=e8e32722-b5cf-47a2-8145-xxxxxxxxxxxx
+  ```
+
+## 其它
+
+- 多行命令用反斜杠 `\` 续行（如上文 bash 示例）。
+- 退出码语义全平台一致：`0` 成功 / `1` 参数错 / `2` API 业务错 / `3` 网络或超时 / `4` 文件系统 / `5` 鉴权。
+
+
+
